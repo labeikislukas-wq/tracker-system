@@ -33,6 +33,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: write   # the successor run is started with the built-in token (workflow_dispatch is allowed)
 
 jobs:
   poll:
@@ -105,7 +106,7 @@ jobs:
         # loop: a run that died in under two minutes does not get a successor.
         if: always()
         env:
-          GH_TOKEN: ${{ secrets.DISPATCH_PAT }}
+          GH_TOKEN: ${{ secrets.DISPATCH_PAT || github.token }}
           RAN_SECONDS: ${{ steps.poll.outputs.ran_seconds }}
           CHAIN_RAW: ${{ github.event.inputs.chain }}
         run: |

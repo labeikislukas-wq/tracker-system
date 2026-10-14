@@ -1,0 +1,59 @@
+name: Apple login
+
+# One-time (or after Apple drops the session) sign-in of the shared Apple ID that
+# fetches the tag locations. Needs the repository secrets APPLE_ID and
+# APPLE_PASSWORD. Apple then sends a 2FA code: run the workflow "Apple code"
+# with it within 10 minutes. On success the session is saved in Supabase and the
+# poller is started.
+
+on:
+  workflow_dispatch:
+    inputs:
+      method:
+        description: "Where Apple sends the code: sms or device"
+        required: false
+        default: "sms"
+
+concurrency:
+  group: apple-login
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  login:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Cache anisette libs
+        uses: actions/cache@v4
+        with:
+          path: /tmp/ani_libs.bin
+          key: ani-libs-v1
+
+      - name: Install dependencies
+        run: pip install -r requirements-poller.txt
+
+      - name: Sign in (waits up to 10 minutes for the code)
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          KEY_ENCRYPTION_KEY: ${{ secrets.KEY_ENCRYPTION_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          TWOFA_METHOD: ${{ github.event.inputs.method }}
+        run: python -m app.ci_apple_login
+
+      - name: Start the poller
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run poll.yml --repo "$GITHUB_REPOSITORY" -f minutes=330 -f chain=true

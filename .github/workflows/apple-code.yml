@@ -1,0 +1,35 @@
+name: Apple code
+
+# Second half of "Apple login": enter the 6-digit code Apple just sent. It is
+# handed to the waiting login run through the database (masked in the log).
+
+on:
+  workflow_dispatch:
+    inputs:
+      code:
+        description: "The 6-digit code Apple just sent"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  code:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install "sqlalchemy>=2.0" "psycopg[binary]>=3.1"
+
+      - name: Hand the code to the waiting login
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+          CODE_RAW: ${{ github.event.inputs.code }}
+        run: python -m app.ci_apple_code

@@ -109,7 +109,7 @@ class AppState(Base):
     Vercel web app, the GitHub Actions poller, and local scripts.
 
     Keys used:
-      'apple_account' -> JSON of the fetching Apple session (from to_json)
+      'apple_account' -> the fetching Apple session (to_json), Fernet-encrypted: 'enc:v1:' + token
       'last_fetch_at' -> ISO timestamp of the last successful poll (cache guard)
     """
 

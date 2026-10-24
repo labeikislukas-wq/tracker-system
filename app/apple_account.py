@@ -20,6 +20,23 @@ log = logging.getLogger("apple")
 
 _ACCOUNT_KEY = "apple_account"
 _LIBS_PATH = Path(tempfile.gettempdir()) / "ani_libs.bin"
+# The session (it includes the Apple ID password) is stored Fernet-encrypted with KEY_ENCRYPTION_KEY, like the tag keys.
+# Rows written before 2026-10-24 are plain JSON: they still load, and the next save encrypts them.
+_ENC_PREFIX = "enc:v1:"
+
+
+def _encode(acc: AppleAccount) -> str:
+    from .security import encrypt_keys
+
+    return _ENC_PREFIX + encrypt_keys(json.dumps(acc.to_json()))
+
+
+def _decode(value: str) -> dict:
+    if value.startswith(_ENC_PREFIX):
+        from .security import decrypt_keys
+
+        value = decrypt_keys(value[len(_ENC_PREFIX):])
+    return json.loads(value)
 
 
 def load_account(db) -> AppleAccount:
@@ -32,7 +49,7 @@ def load_account(db) -> AppleAccount:
             "No Apple session in the database. Run the one-time login first:\n"
             "    python -m app.setup_apple_login"
         )
-    mapping = json.loads(row.value)
+    mapping = _decode(row.value)
     return AppleAccount.from_json(mapping, anisette_libs_path=str(_LIBS_PATH))
 
 
@@ -40,7 +57,7 @@ def save_account(db, acc: AppleAccount) -> None:
     """Persist the (possibly refreshed) Apple session back to the DB."""
     from .models import AppState
 
-    payload = json.dumps(acc.to_json())
+    payload = _encode(acc)
     row = db.get(AppState, _ACCOUNT_KEY)
     if row is None:
         db.add(AppState(key=_ACCOUNT_KEY, value=payload))
